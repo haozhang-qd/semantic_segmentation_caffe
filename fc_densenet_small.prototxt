@@ -1,0 +1,1236 @@
+# fc-densenet train_val
+# two dense blocks in downsampling path
+# one dense block in bottleneck 
+# two dense blocks in upsampling path
+# each dense block contains two layers
+# data layer
+layer {
+  name: "data"
+  type: "Data"
+  top: "data"
+  include { stage: "train" }
+  data_param {
+    batch_size: 1
+    backend: LMDB
+  }
+}
+layer {
+  name: "label"
+  type: "Data"
+  top: "label"
+  include { stage: "train" }
+  data_param {
+    batch_size: 1
+    backend: LMDB
+  }
+}
+layer {
+  name: "data"
+  type: "Data"
+  top: "data"
+  include { stage: "val" }
+  data_param {
+    batch_size: 1
+    backend: LMDB
+  }
+}
+layer {
+  name: "label"
+  type: "Data"
+  top: "label"
+  include { stage: "val" }
+  data_param {
+    batch_size: 1
+    backend: LMDB
+  }
+}
+
+# first conv layer
+layer { 
+    name: "conv1"
+    type: "Convolution"
+    bottom: "data"
+    top: "conv1"
+    convolution_param { 
+        num_output: 48
+        bias_term: false
+        pad: 1 
+        kernel_size: 3 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+
+# Dense Block 1 (Downsample Path)
+# Each layer contains:
+#   Batch_Normalization (BatchNorm + Scale)
+#   ReLU
+#   Convolution
+#   Dropout
+## Layer 1
+layer {
+    name: "ds_db1_bn1"
+    type: "BatchNorm"
+    bottom: "conv1"
+    top: "ds_db1_bn1"
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+}
+layer {
+    name: "ds_db1_scale1"
+    type: "Scale"
+    bottom: "ds_db1_bn1"
+    top: "ds_db1_bn1"
+    scale_param {
+        filler {
+            value: 1
+        }
+        bias_term: true
+        bias_filler {
+            value: 0
+        }
+    }
+}
+layer {
+    name: "ds_db1_relu1"
+    type: "ReLU"
+    bottom: "ds_db1_bn1"
+    top: "ds_db1_bn1"
+}
+layer { 
+    name: "ds_db1_conv1"
+    type: "Convolution"
+    bottom: "ds_db1_bn1"
+    top: "ds_db1_conv1"
+    convolution_param { 
+        num_output: 12
+        bias_term: false 
+        pad: 1 
+        kernel_size: 3 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+layer {
+    name: "ds_db1_drop1"
+    type: "Dropout"
+    bottom: "ds_db1_conv1"
+    top: "ds_db1_drop1"
+    dropout_param {
+        dropout_ratio: 0.2
+    }
+}
+## Concat 1
+layer {
+    name: "ds_db1_concat1"
+    type: "Concat"
+    bottom: "conv1"
+    bottom: "ds_db1_drop1"
+    top: "ds_db1_concat1"
+    concat_param {
+        axis: 1
+    }
+}
+## Layer 2
+layer {
+    name: "ds_db1_bn2"
+    type: "BatchNorm"
+    bottom: "ds_db1_concat1"
+    top: "ds_db1_bn2"
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+}
+layer {
+    name: "ds_db1_scale2"
+    type: "Scale"
+    bottom: "ds_db1_bn2"
+    top: "ds_db1_bn2"
+    scale_param {
+        filler {
+            value: 1
+        }
+        bias_term: true
+        bias_filler {
+            value: 0
+        }
+    }
+}
+layer {
+    name: "ds_db1_relu2"
+    type: "ReLU"
+    bottom: "ds_db1_bn2"
+    top: "ds_db1_bn2"
+}
+layer { 
+    name: "ds_db1_conv2"
+    type: "Convolution"
+    bottom: "ds_db1_bn2"
+    top: "ds_db1_conv2"
+    convolution_param { 
+        num_output: 12
+        bias_term: false 
+        pad: 1 
+        kernel_size: 3 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+layer {
+    name: "ds_db1_drop2"
+    type: "Dropout"
+    bottom: "ds_db1_conv2"
+    top: "ds_db1_drop2"
+    dropout_param {
+        dropout_ratio: 0.2
+    }
+}
+## Concat 2
+## concate output from layer 1 and layer 2 for final output concat
+layer {
+    name: "ds_db1_concat_out12"
+    type: "Concat"
+    bottom: "ds_db1_drop1"
+    bottom: "ds_db1_drop2"
+    top: "ds_db1_concat_out12"
+    concat_param {
+        axis: 1
+    }
+}
+
+# Concat 1 (Downsample Path)
+layer {
+  name: "ds_concat1"
+  type: "Concat"
+  bottom: "conv1"
+  bottom: "ds_db1_concat_out12"
+  top: "ds_concat1"
+  concat_param {
+    axis: 1
+  }
+}
+
+# Transition Down 1 (Downsample Path)
+layer {
+    name: "ds_td1_bn"
+    type: "BatchNorm"
+    bottom: "ds_concat1"
+    top: "ds_td1_bn"
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+}
+layer {
+    name: "ds_td1_scale"
+    type: "Scale"
+    bottom: "ds_td1_bn"
+    top: "ds_td1_scale"
+    scale_param {
+        filler {
+            value: 1
+        }
+        bias_term: true
+        bias_filler {
+            value: 0
+        }
+    }
+}
+layer {
+    name: "ds_td1_relu"
+    type: "ReLU"
+    bottom: "ds_td1_scale"
+    top: "ds_td1_relu"
+}
+layer { 
+    name: "ds_td1_conv"
+    type: "Convolution"
+    bottom: "ds_td1_relu"
+    top: "ds_td1_conv"
+    convolution_param { 
+        num_output: 72
+        bias_term: false 
+        pad: 0 
+        kernel_size: 1 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+layer {
+    name: "ds_td1_drop"
+    type: "Dropout"
+    bottom: "ds_td1_conv"
+    top: "ds_td1_drop"
+    dropout_param {
+        dropout_ratio: 0.2
+    }
+}
+layer { 
+    name: "ds_td1_pool"    
+    type: "Pooling"
+    bottom: "ds_td1_drop"               
+    top: "ds_td1_pool"
+    pooling_param { 
+        pool: MAX 
+        kernel_size: 2 
+        stride: 2 
+    } 
+}
+
+# Dense Block 2 (Downsample Path)
+## Layer 1
+layer {
+    name: "ds_db2_bn1"
+    type: "BatchNorm"
+    bottom: "ds_td1_pool"
+    top: "ds_db2_bn1"
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+}
+layer {
+    name: "ds_db2_scale1"
+    type: "Scale"
+    bottom: "ds_db2_bn1"
+    top: "ds_db2_bn1"
+    scale_param {
+        filler {
+            value: 1
+        }
+        bias_term: true
+        bias_filler {
+            value: 0
+        }
+    }
+}
+layer {
+    name: "ds_db2_relu1"
+    type: "ReLU"
+    bottom: "ds_db2_bn1"
+    top: "ds_db2_bn1"
+}
+layer { 
+    name: "ds_db2_conv1"
+    type: "Convolution"
+    bottom: "ds_db2_bn1"
+    top: "ds_db2_conv1"
+    convolution_param { 
+        num_output: 12
+        bias_term: false 
+        pad: 1 
+        kernel_size: 3 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+layer {
+    name: "ds_db2_drop1"
+    type: "Dropout"
+    bottom: "ds_db2_conv1"
+    top: "ds_db2_drop1"
+    dropout_param {
+        dropout_ratio: 0.2
+    }
+}
+## Concat 1
+layer {
+    name: "ds_db2_concat1"
+    type: "Concat"
+    bottom: "ds_td1_pool"
+    bottom: "ds_db2_drop1"
+    top: "ds_db2_concat1"
+    concat_param {
+        axis: 1
+    }
+}
+## Layer 2
+layer {
+    name: "ds_db2_bn2"
+    type: "BatchNorm"
+    bottom: "ds_db2_concat1"
+    top: "ds_db2_bn2"
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+}
+layer {
+    name: "ds_db2_scale2"
+    type: "Scale"
+    bottom: "ds_db2_bn2"
+    top: "ds_db2_bn2"
+    scale_param {
+        filler {
+            value: 1
+        }
+        bias_term: true
+        bias_filler {
+            value: 0
+        }
+    }
+}
+layer {
+    name: "ds_db2_relu2"
+    type: "ReLU"
+    bottom: "ds_db2_bn2"
+    top: "ds_db2_bn2"
+}
+layer { 
+    name: "ds_db2_conv2"
+    type: "Convolution"
+    bottom: "ds_db2_bn2"
+    top: "ds_db2_conv2"
+    convolution_param { 
+        num_output: 12
+        bias_term: false 
+        pad: 1 
+        kernel_size: 3 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+layer {
+    name: "ds_db2_drop2"
+    type: "Dropout"
+    bottom: "ds_db2_conv2"
+    top: "ds_db2_drop2"
+    dropout_param {
+        dropout_ratio: 0.2
+    }
+}
+## Concat 2
+## concate output from layer 1 and layer 2 for final output concat
+layer {
+    name: "ds_db2_concat_out12"
+    type: "Concat"
+    bottom: "ds_db2_drop1"
+    bottom: "ds_db2_drop2"
+    top: "ds_db2_concat_out12"
+    concat_param {
+        axis: 1
+    }
+}
+
+# Concat 2 (Downsample Path)
+layer {
+  name: "ds_concat2"
+  type: "Concat"
+  bottom: "ds_td1_pool"
+  bottom: "ds_db2_concat_out12"
+  top: "ds_concat2"
+  concat_param {
+    axis: 1
+  }
+}
+
+# Transition Down 2 (Downsample Path)
+layer {
+    name: "ds_td2_bn"
+    type: "BatchNorm"
+    bottom: "ds_concat2"
+    top: "ds_td2_bn"
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+}
+layer {
+    name: "ds_td2_scale"
+    type: "Scale"
+    bottom: "ds_td2_bn"
+    top: "ds_td2_scale"
+    scale_param {
+        filler {
+            value: 1
+        }
+        bias_term: true
+        bias_filler {
+            value: 0
+        }
+    }
+}
+layer {
+    name: "ds_td2_relu"
+    type: "ReLU"
+    bottom: "ds_td2_scale"
+    top: "ds_td2_relu"
+}
+layer { 
+    name: "ds_td2_conv"
+    type: "Convolution"
+    bottom: "ds_td2_relu"
+    top: "ds_td2_conv"
+    convolution_param { 
+        num_output: 96
+        bias_term: false 
+        pad: 0 
+        kernel_size: 1 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+layer {
+    name: "ds_td2_drop"
+    type: "Dropout"
+    bottom: "ds_td2_conv"
+    top: "ds_td2_drop"
+    dropout_param {
+        dropout_ratio: 0.2
+    }
+}
+layer { 
+    name: "ds_td2_pool"    
+    type: "Pooling"
+    bottom: "ds_td2_drop"               
+    top: "ds_td2_pool"
+    pooling_param { 
+        pool: MAX 
+        kernel_size: 2 
+        stride: 2 
+    } 
+}
+
+# Dense Block (Bottleneck)
+## Layer 1
+layer {
+    name: "bn_db_bn1"
+    type: "BatchNorm"
+    bottom: "ds_td2_pool"
+    top: "bn_db_bn1"
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+}
+layer {
+    name: "bn_db_scale1"
+    type: "Scale"
+    bottom: "bn_db_bn1"
+    top: "bn_db_bn1"
+    scale_param {
+        filler {
+            value: 1
+        }
+        bias_term: true
+        bias_filler {
+            value: 0
+        }
+    }
+}
+layer {
+    name: "bn_db_relu1"
+    type: "ReLU"
+    bottom: "bn_db_bn1"
+    top: "bn_db_bn1"
+}
+layer { 
+    name: "bn_db_conv1"
+    type: "Convolution"
+    bottom: "bn_db_bn1"
+    top: "bn_db_conv1"
+    convolution_param { 
+        num_output: 12
+        bias_term: false 
+        pad: 1 
+        kernel_size: 3 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+layer {
+    name: "bn_db_drop1"
+    type: "Dropout"
+    bottom: "bn_db_conv1"
+    top: "bn_db_drop1"
+    dropout_param {
+        dropout_ratio: 0.2
+    }
+}
+## Concat 1
+layer {
+    name: "bn_db_concat1"
+    type: "Concat"
+    bottom: "ds_td2_pool"
+    bottom: "bn_db_drop1"
+    top: "bn_db_concat1"
+    concat_param {
+        axis: 1
+    }
+}
+## Layer 2
+layer {
+    name: "bn_db_bn2"
+    type: "BatchNorm"
+    bottom: "bn_db_concat1"
+    top: "bn_db_bn2"
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+}
+layer {
+    name: "bn_db_scale2"
+    type: "Scale"
+    bottom: "bn_db_bn2"
+    top: "bn_db_bn2"
+    scale_param {
+        filler {
+            value: 1
+        }
+        bias_term: true
+        bias_filler {
+            value: 0
+        }
+    }
+}
+layer {
+    name: "bn_db_relu2"
+    type: "ReLU"
+    bottom: "bn_db_bn2"
+    top: "bn_db_bn2"
+}
+layer { 
+    name: "bn_db_conv2"
+    type: "Convolution"
+    bottom: "bn_db_bn2"
+    top: "bn_db_conv2"
+    convolution_param { 
+        num_output: 12
+        bias_term: false 
+        pad: 1 
+        kernel_size: 3 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+layer {
+    name: "bn_db_drop2"
+    type: "Dropout"
+    bottom: "bn_db_conv2"
+    top: "bn_db_drop2"
+    dropout_param {
+        dropout_ratio: 0.2
+    }
+}
+## Concat 2
+## concate output from layer 1 and layer 2 for final output concat
+layer {
+    name: "bn_db_concat_out12"
+    type: "Concat"
+    bottom: "bn_db_drop1"
+    bottom: "bn_db_drop2"
+    top: "bn_db_concat_out12"
+    concat_param {
+        axis: 1
+    }
+}
+
+# Transition Up 1 (Upsampling Path)
+layer { 
+    name: "us_tu1" 
+    type: "Deconvolution"
+    bottom: "bn_db_concat_out12"               
+    top: "us_tu1"   
+    convolution_param { 
+        num_output: 24 
+        pad: 0 
+        kernel_size: 2 
+        stride: 2 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+            value: 0
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+
+# Concat Skip 1 (Upsampling Path)
+layer {
+    name: "us_concat1"
+    type: "Concat"
+    bottom: "us_tu1"
+    bottom: "ds_concat2"
+    top: "us_concat1"
+    concat_param {
+        axis: 1
+    }
+}
+
+# Dense Block 1 (Downsample Path)
+## Layer 1
+layer {
+    name: "us_db1_bn1"
+    type: "BatchNorm"
+    bottom: "us_concat1"
+    top: "us_db1_bn1"
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+}
+layer {
+    name: "us_db1_scale1"
+    type: "Scale"
+    bottom: "us_db1_bn1"
+    top: "us_db1_bn1"
+    scale_param {
+        filler {
+            value: 1
+        }
+        bias_term: true
+        bias_filler {
+            value: 0
+        }
+    }
+}
+layer {
+    name: "us_db1_relu1"
+    type: "ReLU"
+    bottom: "us_db1_bn1"
+    top: "us_db1_bn1"
+}
+layer { 
+    name: "us_db1_conv1"
+    type: "Convolution"
+    bottom: "us_db1_bn1"
+    top: "us_db1_conv1"
+    convolution_param { 
+        num_output: 12
+        bias_term: false 
+        pad: 1 
+        kernel_size: 3 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    }
+}
+layer {
+    name: "us_db1_drop1"
+    type: "Dropout"
+    bottom: "us_db1_conv1"
+    top: "us_db1_drop1"
+    dropout_param {
+        dropout_ratio: 0.2
+    }
+}
+## Concat 1
+layer {
+    name: "us_db1_concat1"
+    type: "Concat"
+    bottom: "us_concat1"
+    bottom: "us_db1_drop1"
+    top: "us_db1_concat1"
+    concat_param {
+        axis: 1
+    }
+}
+## Layer 2
+layer {
+    name: "us_db1_bn2"
+    type: "BatchNorm"
+    bottom: "us_db1_concat1"
+    top: "us_db1_bn2"
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+}
+layer {
+    name: "us_db1_scale2"
+    type: "Scale"
+    bottom: "us_db1_bn2"
+    top: "us_db1_bn2"
+    scale_param {
+        filler {
+            value: 1
+        }
+        bias_term: true
+        bias_filler {
+            value: 0
+        }
+    }
+}
+layer {
+    name: "us_db1_relu2"
+    type: "ReLU"
+    bottom: "us_db1_bn2"
+    top: "us_db1_bn2"
+}
+layer { 
+    name: "us_db1_conv2"
+    type: "Convolution"
+    bottom: "us_db1_bn2"
+    top: "us_db1_conv2"
+    convolution_param { 
+        num_output: 12
+        bias_term: false 
+        pad: 1 
+        kernel_size: 3 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+layer {
+    name: "us_db1_drop2"
+    type: "Dropout"
+    bottom: "us_db1_conv2"
+    top: "us_db1_drop2"
+    dropout_param {
+        dropout_ratio: 0.2
+    }
+}
+## Concat 2
+## concate output from layer 1 and layer 2 for final output concat
+layer {
+    name: "us_db1_concat_out12"
+    type: "Concat"
+    bottom: "us_db1_drop1"
+    bottom: "us_db1_drop2"
+    top: "us_db1_concat_out12"
+    concat_param {
+        axis: 1
+    }
+}
+
+# Transition Up 2 (Upsampling Path)
+layer { 
+    name: "us_tu2" 
+    type: "Deconvolution"
+    bottom: "us_db1_concat_out12"               
+    top: "us_tu2"   
+    convolution_param { 
+        num_output: 48 
+        pad: 0 
+        kernel_size: 2 
+        stride: 2 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+            value: 0
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    }  
+}
+
+# Concat Skip 2 (Upsampling Path)
+layer {
+    name: "us_concat2"
+    type: "Concat"
+    bottom: "us_tu2"
+    bottom: "ds_concat1"
+    top: "us_concat2"
+    concat_param {
+        axis: 1
+    }
+}
+
+# Dense Block 2 (Downsample Path)
+## Layer 1
+layer {
+    name: "us_db2_bn1"
+    type: "BatchNorm"
+    bottom: "us_concat2"
+    top: "us_db2_bn1"
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+}
+layer {
+    name: "us_db2_scale1"
+    type: "Scale"
+    bottom: "us_db2_bn1"
+    top: "us_db2_bn1"
+    scale_param {
+        filler {
+            value: 1
+        }
+        bias_term: true
+        bias_filler {
+            value: 0
+        }
+    }
+}
+layer {
+    name: "us_db2_relu1"
+    type: "ReLU"
+    bottom: "us_db2_bn1"
+    top: "us_db2_bn1"
+}
+layer { 
+    name: "us_db2_conv1"
+    type: "Convolution"
+    bottom: "us_db2_bn1"
+    top: "us_db2_conv1"
+    convolution_param { 
+        num_output: 12
+        bias_term: false 
+        pad: 1 
+        kernel_size: 3 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+layer {
+    name: "us_db2_drop1"
+    type: "Dropout"
+    bottom: "us_db2_conv1"
+    top: "us_db2_drop1"
+    dropout_param {
+        dropout_ratio: 0.2
+    }
+}
+## Concat 1
+layer {
+    name: "us_db2_concat1"
+    type: "Concat"
+    bottom: "us_concat2"
+    bottom: "us_db2_drop1"
+    top: "us_db2_concat1"
+    concat_param {
+        axis: 1
+    }
+}
+## Layer 2
+layer {
+    name: "us_db2_bn2"
+    type: "BatchNorm"
+    bottom: "us_db2_concat1"
+    top: "us_db2_bn2"
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+    param {
+        lr_mult: 0
+        decay_mult: 0
+    }
+}
+layer {
+    name: "us_db2_scale2"
+    type: "Scale"
+    bottom: "us_db2_bn2"
+    top: "us_db2_bn2"
+    scale_param {
+        filler {
+            value: 1
+        }
+        bias_term: true
+        bias_filler {
+            value: 0
+        }
+    }
+}
+layer {
+    name: "us_db2_relu2"
+    type: "ReLU"
+    bottom: "us_db2_bn2"
+    top: "us_db2_bn2"
+}
+layer { 
+    name: "us_db2_conv2"
+    type: "Convolution"
+    bottom: "us_db2_bn2"
+    top: "us_db2_conv2"
+    convolution_param { 
+        num_output: 12
+        bias_term: false 
+        pad: 1 
+        kernel_size: 3 
+        stride: 1 
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+        }
+    }
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+layer {
+    name: "us_db2_drop2"
+    type: "Dropout"
+    bottom: "us_db2_conv2"
+    top: "us_db2_drop2"
+    dropout_param {
+        dropout_ratio: 0.2
+    }
+}
+## Concat 2
+## concate output from layer 1 and layer 2 for final output concat
+layer {
+    name: "us_db2_concat_out12"
+    type: "Concat"
+    bottom: "us_db2_drop1"
+    bottom: "us_db2_drop2"
+    top: "us_db2_concat_out12"
+    concat_param {
+        axis: 1
+    }
+}
+
+# final conv layer
+layer { 
+    name: "conv_score" 
+    type: "Convolution"
+    bottom: "us_db2_concat_out12"              
+    top: "conv_score"
+    convolution_param { 
+        num_output: 2 
+        bias_term: false
+        pad: 0 
+        kernel_size: 1 
+        stride: 1
+        weight_filler { 
+            type: "msra"
+        }
+        bias_filler {
+            type: "constant"
+            value: 0
+        }
+    } 
+    param {
+        lr_mult: 1
+        decay_mult: 1
+    } 
+}
+
+layer { 
+    name: "loss"  
+    type: "SoftmaxWithLoss"
+    bottom: "conv_score"
+    bottom: "label"
+    top: "loss" 
+    loss_param { 
+        ignore_label: 255 
+        normalize: true
+    }
+    exclude { stage: "deploy" }
+}
+
+layer {
+    name: "accuracy"
+    type: "Accuracy"
+    bottom: "conv_score"
+    bottom: "label"
+    top: "accuracy"
+    include { stage: "val" }
+    accuracy_param { ignore_label: 255 }
+}
